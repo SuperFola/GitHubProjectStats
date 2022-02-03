@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>GitHub Project Stats</title>
+    <meta http-equiv="Content-Type" content="text/html;charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="assets/css/index.css">
+
+    <script src="assets/js/index.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"
+        integrity="sha512-TW5s0IT/IppJtu76UbysrBH9Hy/5X41OTAbQuffZFU6lQ1rdcLHzpU5BzVvr/YFykoiMYZVWlr/PX1mDcfM9Qg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/moment"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-moment"></script>
+</head>
+
+<body>
+    <div class="container">
+        <h1>GitHub Project Stats</h1>
+        <div>
+            <div class="row">
+                <div class="col-md-5">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="github_user" placeholder="Username"
+                            aria-label="Username">
+                        <span class="input-group-text">/</span>
+                        <input type="text" class="form-control" id="github_repo" placeholder="Repository"
+                            aria-label="Repository">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <input type="text" class="form-control" id="github_token" placeholder="token" aria-label="Token"
+                        hidden>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-info" id="set_token_btn">Set token</button>
+                    <button class="btn btn-primary" id="get_stats_btn">Submit</button>
+                </div>
+            </div>
+            <h3 id="project"></h3>
+        </div>
+        <div class="row" id="charts">
+            <div class="col-md-6" id="stars">
+                <h4>Star history of the project</h4>
+                <canvas id="starschart"></canvas>
+            </div>
+            <div class="col-md-6" id="dlPerRelease">
+                <h4>Downloads per release</h4>
+                <canvas id="dlchart" style="width: 50%"></canvas>
+            </div>
+        </div>
+        <div class="row" id="releases"></div>
+    </div>
+</body>
+
+</html>
