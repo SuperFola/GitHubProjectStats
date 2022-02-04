@@ -4,6 +4,12 @@ function formatNumber(value) {
     return value.toString().replace(/(\d)(?=(\d{3})+$)/g, '$1,')
 }
 
+function getURLParam(name) {
+    const queryString = window.location.search
+    const urlParams = new URLSearchParams(queryString)
+    return urlParams.get(name)
+}
+
 async function getUserRepos(user) {
     let repoNames = []
     const url = `${apiRoot}users/${user}/repos`
@@ -141,10 +147,10 @@ function showReleasesStats(data) {
     document.getElementById("releases").innerHTML = html
 }
 
-async function getRepoStargazer(repo, page) {
+async function getRepoStargazer(repo, page, pageLength) {
     let url = `${apiRoot}repos/${repo}/stargazers`
     if (page !== undefined) {
-        url = `${url}?page=${page}&per_page=100`
+        url = `${url}?page=${page}&per_page=${pageLength}`
     }
 
     const token = localStorage.getItem("token")
@@ -161,27 +167,40 @@ async function getRepoStargazer(repo, page) {
 }
 
 async function getStarRecord(user, repo) {
-    let stars = []
+    const maxStars = (await (await fetch(`${apiRoot}repos/${user}/${repo}`)).json())["stargazers_count"]
+
+    const maxRequests = 15
+    const pageLength = 100
+    const range = [1, Math.ceil(maxStars / pageLength)]
+    const skipPage = Math.ceil((range[1] - range[0]) / maxRequests)
+
+    let stars = {}
     let page = 1
 
     while (true) {
-        const data = await getRepoStargazer(`${user}/${repo}`, page)
-        stars = stars.concat(data)
+        const data = await getRepoStargazer(`${user}/${repo}`, page, pageLength)
 
-        if (data.length < 100) {
+        for (let i = 0, step = (data.length === pageLength) ? 20 : 4; i * step < data.length; ++i) {
+            stars[data[i * step]] = 1 + i * step + (page - 1) * pageLength
+        }
+
+        if (data.length < pageLength) {
             break
         }
-        ++page
+        page += skipPage
     }
 
-    return stars
+    return {
+        history: stars,
+        total: maxStars,
+    }
 }
 
 function showStarsStats(data) {
-    let xValues = [...Array(data.length).keys()]
-    let stars = [...new Set(data)].map(d => (new Date(d)).getTime())
+    let xValues = [...new Set(Object.values(data.history))]
+    let stars = [...new Set(Object.keys(data.history))].map(d => (new Date(d)).getTime())
 
-    let chart = new Chart("starschart", {
+    let chart = new Chart("linechart", {
         type: "line",
         data: {
             labels: stars,
@@ -189,14 +208,11 @@ function showStarsStats(data) {
                 pointRadius: 0,
                 borderColor: 'rgba(0, 0, 0, 0.8)',
                 data: xValues,
+                label: 'Stars',
+                tension: 0.3,
             }]
         },
         options: {
-            plugins: {
-                legend: {
-                    display: false,
-                },
-            },
             scales: {
                 x: {
                     type: 'time',
@@ -205,7 +221,7 @@ function showStarsStats(data) {
                     },
                 },
                 yAxis: {
-                    max: stars.length,
+                    max: data.total,
                 },
             },
         },
@@ -232,6 +248,10 @@ async function getStats(user, repository, page, perPage) {
 }
 
 window.onload = () => {
+    if (getURLParam("user") && getURLParam("repo")) {
+        getStats(getURLParam("user"), getURLParam("repo"))
+    }
+
     if (localStorage.getItem("token")) {
         document.getElementById("github_token").value = localStorage.getItem("token")
     }
