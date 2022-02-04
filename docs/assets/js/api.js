@@ -35,12 +35,17 @@ async function getScope(repo, page, pageLength, scope) {
 
 async function getRepoStargazer(repo, page, pageLength) {
     const json = await getScope(repo, page, pageLength, { name: "stargazers", headers: { Accept: "application/vnd.github.v3.star+json", }, })
-    return json.map(val => val.starred_at)
+    return json
 }
 
 async function getRepoForker(repo, page, pageLength) {
     const json = await getScope(repo, page, pageLength, { name: "forks", headers: {}, })
-    return json.map(val => val.created_at)
+    return json
+}
+
+async function getRepoRelease(repo, page, pageLength) {
+    const json = await getScope(repo, page, pageLength, { name: "releases", headers: {}, })
+    return json
 }
 
 async function getRepoData(user, repo) {
@@ -50,9 +55,9 @@ async function getRepoData(user, repo) {
 }
 
 async function getRecordFor(user, repo, repoData, ressource) {
-    const maxRessource = repoData[ressource.count]
+    const maxRessource = repoData[ressource.count] || ressource.count
 
-    const maxRequests = 15
+    const maxRequests = ressource.maxReq || 15
     const pageLength = 100
     const range = [1, Math.ceil(maxRessource / pageLength)]
     const skipPage = Math.ceil((range[1] - range[0]) / maxRequests)
@@ -63,17 +68,21 @@ async function getRecordFor(user, repo, repoData, ressource) {
     }
     let page = 1
 
+    let step = 5
+    if (ressource.value !== "count")
+        step = 1
+
     while (true) {
         const next = await ressource.fetch(`${user}/${repo}`, page, pageLength)
 
-        for (let i = 0, step = (next.length === pageLength) ? 20 : 4; i * step < next.length; ++i) {
-            data.keys.push(next[i * step])
-            data.values.push(1 + i * step + (page - 1) * pageLength)
+        for (let i = 0; i * step < next.length; ++i) {
+            data.keys.push(next[i * step][ressource.key])
+            data.values.push(ressource.value === "count" ? 1 + i * step + (page - 1) * pageLength : next[i * step][ressource.value])
         }
 
         if (next.length < pageLength) {
-            data.keys.push(next[next.length - 1])
-            data.values.push(next.length + (page - 1) * pageLength)
+            data.keys.push(next[next.length - 1][ressource.key])
+            data.values.push(ressource.value === "count" ? next.length + (page - 1) * pageLength : next[next.length - 1][ressource.value])
         }
 
         if (next.length < pageLength) {

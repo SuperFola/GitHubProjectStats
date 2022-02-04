@@ -17,6 +17,21 @@ function showReleasesStats(data) {
     let err = false
     let errMessage = ''
     let html = ""
+    const colors = [
+        "#00876c",
+        "#44926c",
+        "#679d6f",
+        "#85a776",
+        "#a1b180",
+        "#babc8d",
+        "#d2c69e",
+        "#d1b583",
+        "#d2a26d",
+        "#d48d5c",
+        "#d67551",
+        "#d65c4e",
+        "#d43d51",
+    ]
 
     if (data.status == 404) {
         err = true
@@ -69,7 +84,7 @@ function showReleasesStats(data) {
                 })
             }
 
-            let key = Object.keys(downloadsPerRelease).length > 8 ? "Others" : releaseTag
+            let key = Object.keys(downloadsPerRelease).length >= (colors.length - 1) ? "Others" : releaseTag
             downloadsPerRelease[key] = (downloadsPerRelease[key] || 0) + releaseDownloadCount
 
             html += "<div class='row release'>"
@@ -100,21 +115,7 @@ function showReleasesStats(data) {
             data: {
                 labels: Array.from(Object.keys(downloadsPerRelease)),
                 datasets: [{
-                    backgroundColor: [
-                        "#00876c",
-                        "#44926c",
-                        "#679d6f",
-                        "#85a776",
-                        "#a1b180",
-                        "#babc8d",
-                        "#d2c69e",
-                        "#d1b583",
-                        "#d2a26d",
-                        "#d48d5c",
-                        "#d67551",
-                        "#d65c4e",
-                        "#d43d51",
-                    ],
+                    backgroundColor: colors,
                     data: Array.from(Object.values(downloadsPerRelease)),
                     radius: "66%",
                 }]
@@ -154,6 +155,35 @@ function getAxis(history) {
         })
 }
 
+function getNearestStarsCount(stars, time) {
+    if (stars[time])
+        return stars[time]
+
+    let monthsBack = 0
+    let [year, month, day] = time.split("-")
+
+    while (true) {
+        if (day > 1)
+            day--
+        else {
+            day = 31
+            if (month > 1) {
+                monthsBack++
+                month--
+            } else {
+                month = 12
+                year--
+            }
+        }
+
+        let test = stars[`${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`]
+        if (test)
+            return test
+        if (monthsBack > 1)
+            return null
+    }
+}
+
 async function showHistoryStats(user, repository) {
     if (lineChart !== null) {
         lineChart.destroy()
@@ -161,11 +191,22 @@ async function showHistoryStats(user, repository) {
 
     const repoData = await getRepoData(user, repository)
 
-    let starsData = await getRecordFor(user, repository, repoData, { count: "stargazers_count", fetch: getRepoStargazer, })
+    let starsData = await getRecordFor(user, repository, repoData, { key: "starred_at", value: "count", count: "stargazers_count", fetch: getRepoStargazer, })
     let stars = getAxis(starsData.history)
+    let starsNearest = Object.fromEntries(Object.keys(starsData.history).map(time => [time.split("T")[0], starsData.history[time]]))
 
-    let forksData = await getRecordFor(user, repository, repoData, { count: "forks_count", fetch: getRepoForker, })
+    let forksData = await getRecordFor(user, repository, repoData, { key: "created_at", value: "count", count: "forks_count", fetch: getRepoForker, })
     let forks = getAxis(forksData.history)
+
+    let releasesData = await getRecordFor(user, repository, repoData, { key: "created_at", value: "tag_name", count: 100, maxReq: 10, fetch: getRepoRelease, })
+    let releases = Object.keys(releasesData.history).map(time => {
+        return {
+            x: (new Date(time)).getTime(),
+            y: getNearestStarsCount(starsNearest, time),
+        }
+    })
+
+    let labels = Object.values(releasesData.history)
 
     lineChart = new Chart("linechart", {
         type: "scatter",
@@ -174,19 +215,25 @@ async function showHistoryStats(user, repository) {
                 {
                     label: 'Stars',
                     data: stars,
-                    pointRadius: 0,
                     showLine: true,
+                    pointRadius: 0,
                     borderColor: 'rgba(0, 0, 0, 0.8)',
                     tension: 0.3,
-                    yAxisID: 'y',
+                    yAxisID: 'y1',
                 }, {
                     label: 'Forks',
                     data: forks,
-                    pointRadius: 0,
                     showLine: true,
+                    pointRadius: 0,
                     borderColor: 'rgba(255, 50, 88, 0.8)',
                     tension: 0.2,
-                    yAxisID: 'y1',
+                    yAxisID: 'y2',
+                }, {
+                    labels,
+                    label: 'Releases',
+                    data: releases,
+                    borderColor: 'rgba(60, 60, 180, 0.6)',
+                    pointRadius: 5,
                 }
             ],
         },
@@ -206,12 +253,12 @@ async function showHistoryStats(user, repository) {
                         unit: 'week',
                     },
                 },
-                y: {
+                y1: {
                     type: 'linear',
                     display: true,
                     position: 'left',
                 },
-                y1: {
+                y2: {
                     type: 'linear',
                     display: true,
                     position: 'right',
