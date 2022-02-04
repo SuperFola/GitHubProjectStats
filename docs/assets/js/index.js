@@ -13,17 +13,6 @@ function getURLParam(name) {
     return urlParams.get(name)
 }
 
-async function getUserRepos(user) {
-    let repoNames = []
-    const url = `${apiRoot}users/${user}/repos`
-
-    const res = await fetch(url)
-    const json = await res.json()
-
-    json.forEach(item => repoNames.push(item.name))
-    return repoNames
-}
-
 function showReleasesStats(data) {
     let err = false
     let errMessage = ''
@@ -155,27 +144,8 @@ function showReleasesStats(data) {
     document.getElementById("releases").innerHTML = html
 }
 
-async function getRepoStargazer(repo, page, pageLength) {
-    let url = `${apiRoot}repos/${repo}/stargazers`
-    if (page !== undefined) {
-        url = `${url}?page=${page}&per_page=${pageLength}`
-    }
-
-    const token = localStorage.getItem("token")
-    const res = await fetch(url, {
-        method: "GET",
-        headers: {
-            Accept: "application/vnd.github.v3.star+json",
-            Authorization: token ? `token ${token}` : "",
-        },
-    })
-    const json = await res.json()
-
-    return json.map(val => val.starred_at)
-}
-
-async function getStarRecord(user, repo) {
-    const maxStars = (await (await fetch(`${apiRoot}repos/${user}/${repo}`)).json())["stargazers_count"]
+async function getStarRecord(user, repo, repoData) {
+    const maxStars = repoData["stargazers_count"]
 
     const maxRequests = 15
     const pageLength = 100
@@ -204,22 +174,38 @@ async function getStarRecord(user, repo) {
     }
 }
 
-function showStarsStats(data) {
-    let xValues = [...new Set(Object.values(data.history))]
-    let stars = [...new Set(Object.keys(data.history))].map(d => (new Date(d)).getTime())
+async function getForkRecord(user, repository, repoData) {
+    const maxForks = repoData["forks_count"]
 
+    let forks = {}
+
+    return {
+        total: maxForks,
+        history: forks,
+    }
+}
+
+async function showHistoryStats(user, repository) {
     if (lineChart !== null) {
         lineChart.destroy()
     }
 
+    const repoData = await getRepoData(user, repository)
+
+    let starsData = await getStarRecord(user, repository, repoData)
+    let starsX = [...new Set(Object.values(starsData.history))]
+    let starsY = [...new Set(Object.keys(starsData.history))].map(d => (new Date(d)).getTime())
+
+    let forksData = await getForkRecord(user, repository, repoData)
+
     lineChart = new Chart("linechart", {
         type: "line",
         data: {
-            labels: stars,
+            labels: starsY,
             datasets: [{
                 pointRadius: 0,
                 borderColor: 'rgba(0, 0, 0, 0.8)',
-                data: xValues,
+                data: starsX,
                 label: 'Stars',
                 tension: 0.3,
             }]
@@ -233,7 +219,7 @@ function showStarsStats(data) {
                     },
                 },
                 yAxis: {
-                    max: data.total,
+                    max: starsData.total,
                 },
             },
         },
@@ -250,10 +236,9 @@ async function getStats(user, repository, page, perPage) {
         const json = await res.json()
         showReleasesStats(json)
     }
-    // stars
+    // history (stars, forks...)
     {
-        const json = await getStarRecord(user, repository)
-        showStarsStats(json)
+        await showHistoryStats(user, repository)
     }
 }
 
