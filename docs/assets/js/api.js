@@ -1,8 +1,15 @@
+function getAuthorizationHeader() {
+    const token = localStorage.getItem("token")
+    return {
+        Authorization: token ? `token ${token}` : "",
+    }
+}
+
 async function getUserRepos(user) {
     let repoNames = []
     const url = `${apiRoot}users/${user}/repos`
 
-    const res = await fetch(url)
+    const res = await fetch(url, { headers: { ...getAuthorizationHeader() } })
     const json = await res.json()
 
     json.forEach(item => repoNames.push(item.name))
@@ -15,12 +22,11 @@ async function getScope(repo, page, pageLength, scope) {
         url = `${url}?page=${page}&per_page=${pageLength}`
     }
 
-    const token = localStorage.getItem("token")
     const res = await fetch(url, {
         method: "GET",
         headers: {
             ...scope.headers,
-            Authorization: token ? `token ${token}` : "",
+            ...getAuthorizationHeader(),
         },
     })
     const json = await res.json()
@@ -38,7 +44,37 @@ async function getRepoForker(repo, page, pageLength) {
 }
 
 async function getRepoData(user, repo) {
-    const res = await fetch(`${apiRoot}repos/${user}/${repo}`)
+    const res = await fetch(`${apiRoot}repos/${user}/${repo}`, { headers: { ...getAuthorizationHeader(), }, })
     const json = await res.json()
     return json
+}
+
+async function getRecordFor(user, repo, repoData, ressource) {
+    const maxRessource = repoData[ressource.count]
+
+    const maxRequests = 15
+    const pageLength = 100
+    const range = [1, Math.ceil(maxRessource / pageLength)]
+    const skipPage = Math.ceil((range[1] - range[0]) / maxRequests)
+
+    let data = {}
+    let page = 1
+
+    while (true) {
+        const next = await ressource.fetch(`${user}/${repo}`, page, pageLength)
+
+        for (let i = 0, step = (next.length === pageLength) ? 20 : 4; i * step < next.length; ++i) {
+            data[next[i * step]] = 1 + i * step + (page - 1) * pageLength
+        }
+
+        if (next.length < pageLength) {
+            break
+        }
+        page += skipPage
+    }
+
+    return {
+        history: data,
+        total: maxRessource,
+    }
 }

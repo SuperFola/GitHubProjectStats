@@ -144,44 +144,10 @@ function showReleasesStats(data) {
     document.getElementById("releases").innerHTML = html
 }
 
-async function getStarRecord(user, repo, repoData) {
-    const maxStars = repoData["stargazers_count"]
-
-    const maxRequests = 15
-    const pageLength = 100
-    const range = [1, Math.ceil(maxStars / pageLength)]
-    const skipPage = Math.ceil((range[1] - range[0]) / maxRequests)
-
-    let stars = {}
-    let page = 1
-
-    while (true) {
-        const data = await getRepoStargazer(`${user}/${repo}`, page, pageLength)
-
-        for (let i = 0, step = (data.length === pageLength) ? 20 : 4; i * step < data.length; ++i) {
-            stars[data[i * step]] = 1 + i * step + (page - 1) * pageLength
-        }
-
-        if (data.length < pageLength) {
-            break
-        }
-        page += skipPage
-    }
-
+function getAxis(history) {
     return {
-        history: stars,
-        total: maxStars,
-    }
-}
-
-async function getForkRecord(user, repository, repoData) {
-    const maxForks = repoData["forks_count"]
-
-    let forks = {}
-
-    return {
-        total: maxForks,
-        history: forks,
+        x: [...new Set(Object.values(history))],
+        y: [...new Set(Object.keys(history))].map(d => (new Date(d)).getTime()),
     }
 }
 
@@ -192,25 +158,41 @@ async function showHistoryStats(user, repository) {
 
     const repoData = await getRepoData(user, repository)
 
-    let starsData = await getStarRecord(user, repository, repoData)
-    let starsX = [...new Set(Object.values(starsData.history))]
-    let starsY = [...new Set(Object.keys(starsData.history))].map(d => (new Date(d)).getTime())
+    let starsData = await getRecordFor(user, repository, repoData, { count: "stargazers_count", fetch: getRepoStargazer, })
+    let stars = getAxis(starsData.history)
 
-    let forksData = await getForkRecord(user, repository, repoData)
+    let forksData = await getRecordFor(user, repository, repoData, { count: "forks_count", fetch: getRepoForker, })
+    let forks = getAxis(forksData.history)
 
     lineChart = new Chart("linechart", {
         type: "line",
         data: {
-            labels: starsY,
-            datasets: [{
-                pointRadius: 0,
-                borderColor: 'rgba(0, 0, 0, 0.8)',
-                data: starsX,
-                label: 'Stars',
-                tension: 0.3,
-            }]
+            labels: [stars.y, forks.y],
+            datasets: [
+                {
+                    pointRadius: 0,
+                    borderColor: 'rgba(0, 0, 0, 0.8)',
+                    data: stars.x,
+                    label: 'Stars',
+                    tension: 0.3,
+                    yAxisID: 'y',
+                }, {
+                    pointRadius: 0,
+                    borderColor: 'rgba(0.3, 0.6, 0.1, 0.8)',
+                    data: forks.x,
+                    label: 'Forks',
+                    tension: 0.2,
+                    yAxisID: 'y1',
+                }
+            ],
         },
         options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            stacked: false,
             scales: {
                 x: {
                     type: 'time',
@@ -218,8 +200,15 @@ async function showHistoryStats(user, repository) {
                         unit: 'week',
                     },
                 },
-                yAxis: {
-                    max: starsData.total,
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
                 },
             },
         },
@@ -232,7 +221,7 @@ async function getStats(user, repository, page, perPage) {
     // releases
     {
         const url = `${apiRoot}repos/${user}/${repository}/releases?page=${page}&per_page=${perPage}`
-        const res = await fetch(url)
+        const res = await fetch(url, { headers: { ...getAuthorizationHeader() } })
         const json = await res.json()
         showReleasesStats(json)
     }
@@ -244,7 +233,7 @@ async function getStats(user, repository, page, perPage) {
 
 window.onload = () => {
     if (getURLParam("user") && getURLParam("repo")) {
-        getStats(getURLParam("user"), getURLParam("repo"))
+        getStats(getURLParam("user"), getURLParam("repo"), 1, 50)
     }
 
     if (localStorage.getItem("token")) {
@@ -266,7 +255,7 @@ window.onload = () => {
         let repo = document.getElementById("github_repo").value
 
         if (user !== "" && repo !== "") {
-            getStats(user, repo, 0, 50)
+            getStats(user, repo, 1, 50)
         } else {
             alert("Incomplete informations")
         }
