@@ -57,14 +57,23 @@ async function getRecordFor(user, repo, repoData, ressource) {
     const range = [1, Math.ceil(maxRessource / pageLength)]
     const skipPage = Math.ceil((range[1] - range[0]) / maxRequests)
 
-    let data = {}
+    let data = {
+        keys: [],
+        values: [],
+    }
     let page = 1
 
     while (true) {
         const next = await ressource.fetch(`${user}/${repo}`, page, pageLength)
 
         for (let i = 0, step = (next.length === pageLength) ? 20 : 4; i * step < next.length; ++i) {
-            data[next[i * step]] = 1 + i * step + (page - 1) * pageLength
+            data.keys.push(next[i * step])
+            data.values.push(1 + i * step + (page - 1) * pageLength)
+        }
+
+        if (next.length < pageLength) {
+            data.keys.push(next[next.length - 1])
+            data.values.push(next.length + (page - 1) * pageLength)
         }
 
         if (next.length < pageLength) {
@@ -74,7 +83,7 @@ async function getRecordFor(user, repo, repoData, ressource) {
     }
 
     return {
-        history: data,
+        history: Object.fromEntries(data.keys.sort().map((el, i) => [el, data.values[i]])),
         total: maxRessource,
     }
 }

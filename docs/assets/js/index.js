@@ -34,7 +34,7 @@ function showReleasesStats(data) {
     if (err) {
         html += `<div class='col-md-6 col-md-offset-3 alert alert-danger'>${errMessage}</div>`
     } else {
-        html += "<div class='row'>"
+        html += "<div class='row justify-content-center'>"
 
         let downloadsPerRelease = {}
         let totalDownloadCount = 0
@@ -145,10 +145,13 @@ function showReleasesStats(data) {
 }
 
 function getAxis(history) {
-    return {
-        x: [...new Set(Object.values(history))],
-        y: [...new Set(Object.keys(history))].map(d => (new Date(d)).getTime()),
-    }
+    return Array.from(Object.keys(history))
+        .map(key => {
+            return {
+                x: (new Date(key)).getTime(),
+                y: history[key],
+            }
+        })
 }
 
 async function showHistoryStats(user, repository) {
@@ -165,34 +168,37 @@ async function showHistoryStats(user, repository) {
     let forks = getAxis(forksData.history)
 
     lineChart = new Chart("linechart", {
-        type: "line",
+        type: "scatter",
         data: {
-            labels: [stars.y, forks.y],
             datasets: [
                 {
-                    pointRadius: 0,
-                    borderColor: 'rgba(0, 0, 0, 0.8)',
-                    data: stars.x,
                     label: 'Stars',
+                    data: stars,
+                    pointRadius: 0,
+                    showLine: true,
+                    borderColor: 'rgba(0, 0, 0, 0.8)',
                     tension: 0.3,
                     yAxisID: 'y',
                 }, {
-                    pointRadius: 0,
-                    borderColor: 'rgba(0.3, 0.6, 0.1, 0.8)',
-                    data: forks.x,
                     label: 'Forks',
+                    data: forks,
+                    pointRadius: 0,
+                    showLine: true,
+                    borderColor: 'rgba(255, 50, 88, 0.8)',
                     tension: 0.2,
                     yAxisID: 'y1',
                 }
             ],
         },
         options: {
-            responsive: true,
-            interaction: {
+            tooltips: {
                 mode: 'index',
                 intersect: false,
             },
-            stacked: false,
+            hover: {
+                mode: 'nearest',
+                intersect: true
+            },
             scales: {
                 x: {
                     type: 'time',
