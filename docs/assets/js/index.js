@@ -1,5 +1,8 @@
 const apiRoot = "https://api.github.com/"
 
+let pieChart = null
+let lineChart = null
+
 function formatNumber(value) {
     return value.toString().replace(/(\d)(?=(\d{3})+$)/g, '$1,')
 }
@@ -98,7 +101,12 @@ function showReleasesStats(data) {
             html += `</ul>${downloadInfoHTML}</div>`
         })
 
-        let dlchart = new Chart("dlchart", {
+
+        if (pieChart !== null) {
+            pieChart.destroy()
+        }
+
+        pieChart = new Chart("dlchart", {
             type: "pie",
             data: {
                 labels: Array.from(Object.keys(downloadsPerRelease)),
@@ -200,7 +208,11 @@ function showStarsStats(data) {
     let xValues = [...new Set(Object.values(data.history))]
     let stars = [...new Set(Object.keys(data.history))].map(d => (new Date(d)).getTime())
 
-    let chart = new Chart("linechart", {
+    if (lineChart !== null) {
+        lineChart.destroy()
+    }
+
+    lineChart = new Chart("linechart", {
         type: "line",
         data: {
             labels: stars,
@@ -226,8 +238,6 @@ function showStarsStats(data) {
             },
         },
     })
-
-    return chart
 }
 
 async function getStats(user, repository, page, perPage) {
